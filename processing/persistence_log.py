@@ -27,9 +27,8 @@ import sys
 import sqlite3
 import argparse
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple, Optional
+from typing import List
 import pandas as pd
-import numpy as np
 
 # Compatible H3 import across versions
 try:
@@ -179,42 +178,6 @@ def update_persistence_log(df_hotspots: pd.DataFrame, db_path: str = str(DB_PATH
     df_work["night_detection_fraction"] = night_fractions
 
     return df_work
-
-
-def query_persistence_features(location_key: str, as_of_date: str, db_path: str = str(DB_PATH)) -> Dict[str, float]:
-    """
-    Helper function to query persistence metrics for a single location_key.
-    """
-    init_db(db_path)
-    try:
-        curr_date = datetime.strptime(as_of_date, "%Y-%m-%d")
-    except Exception:
-        curr_date = datetime.now()
-    start_date = (curr_date - timedelta(days=30)).strftime("%Y-%m-%d")
-
-    with sqlite3.connect(db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-        SELECT COUNT(DISTINCT acq_date) FROM hotspot_history
-        WHERE location_key = ? AND acq_date BETWEEN ? AND ?
-        """, (location_key, start_date, as_of_date))
-        days = cursor.fetchone()[0] or 1
-
-        cursor.execute("""
-        SELECT 
-            SUM(CASE WHEN daynight = 'N' THEN 1 ELSE 0 END),
-            COUNT(*)
-        FROM hotspot_history
-        WHERE location_key = ? AND acq_date <= ?
-        """, (location_key, as_of_date))
-        n_night, total = cursor.fetchone()
-        night_frac = (float(n_night) / float(total)) if total and total > 0 else 0.5
-
-    return {
-        "days_active_last_30": int(days),
-        "duty_cycle": round(days / 30.0, 3),
-        "night_detection_fraction": round(night_frac, 3),
-    }
 
 
 if __name__ == "__main__":

@@ -28,14 +28,14 @@ import io
 import time
 import argparse
 from datetime import datetime, timedelta
-from typing import Dict, Optional, List
+from typing import Optional, List
 import requests
 import pandas as pd
 import numpy as np
 
 # Ensure module import works when run as script
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config.settings import FIRMS_MAP_KEY, FIRMS_BASE_URL, FIRMS_SOURCE, DEFAULT_BBOX, DATA_DIR
+from config.settings import FIRMS_MAP_KEY, FIRMS_BASE_URL, FIRMS_SOURCE, DEFAULT_BBOX
 
 # Required schema columns from VIIRS NRT
 REQUIRED_FIRMS_COLUMNS = [

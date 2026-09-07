@@ -33,7 +33,7 @@ import json
 import sqlite3
 import argparse
 from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, Tuple, Any, Optional
 import numpy as np
 import pandas as pd
 
@@ -94,8 +94,6 @@ class ModelBAnomalyEngine:
                 "mad": round(mad, 2),
                 "n_samples": n_samples,
                 "industrial_type": ind_type,
-                "min_frp": round(float(np.min(frp_values)), 2),
-                "max_frp": round(float(np.max(frp_values)), 2),
             }
 
         # 2. Regional / Industrial-type baselines (for unmapped or <10 point locations)

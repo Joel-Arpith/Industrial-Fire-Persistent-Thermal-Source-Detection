@@ -28,11 +28,10 @@ import sys
 import argparse
 import joblib
 from pathlib import Path
-from typing import Dict, List, Tuple, Any, Optional
+from typing import Dict, List, Any, Optional
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 import shap
 

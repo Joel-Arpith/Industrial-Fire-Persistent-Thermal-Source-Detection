@@ -26,7 +26,7 @@ import os
 import sys
 import argparse
 from datetime import datetime
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple
 import requests
 import pandas as pd
 import numpy as np

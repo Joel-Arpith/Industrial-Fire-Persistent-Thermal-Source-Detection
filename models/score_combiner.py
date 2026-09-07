@@ -38,7 +38,7 @@ STRICT RULES OBSERVED:
 import os
 import sys
 import argparse
-from typing import Dict, Any, List
+from typing import Dict, Any
 import numpy as np
 
 # Ensure module import works when run as script

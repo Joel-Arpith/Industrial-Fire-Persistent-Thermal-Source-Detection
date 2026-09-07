@@ -25,10 +25,9 @@ STRICT RULES OBSERVED:
 import os
 import sys
 import argparse
-from typing import Dict, List, Optional
+from typing import Dict
 import requests
 import pandas as pd
-import numpy as np
 
 # Ensure module import works when run as script
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
