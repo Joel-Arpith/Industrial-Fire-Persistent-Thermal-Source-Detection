@@ -29,6 +29,3 @@ CREATE TABLE IF NOT EXISTS hotspot_history (
   PRIMARY KEY (location_key, acq_date, acq_time)
 );
 
--- Index on location_key and acq_date for fast rolling 30-day lookups
-CREATE INDEX IF NOT EXISTS idx_hotspot_history_lookup 
-ON hotspot_history (location_key, acq_date);

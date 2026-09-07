@@ -23,9 +23,7 @@ OUTPUT:
 
 import os
 import sys
-from pathlib import Path
 from typing import List, Optional
-import pandas as pd
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn

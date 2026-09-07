@@ -33,8 +33,6 @@ import os
 import sys
 import time
 import argparse
-from pathlib import Path
-import pandas as pd
 
 # Ensure module import works when run as script
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -135,11 +133,6 @@ def run_training_pipeline(
     model_a = ModelAClassifier(ARTIFACTS_DIR)
     metrics_a = model_a.train(df_labeled)
     print(f" -> Model A trained. Validation Accuracy: {metrics_a.get('val_accuracy', 0.0):.2%}")
-
-    # Model B: Facility-Baseline Anomaly Engine
-    print("\n--- Fitting Model B (Statistical Facility Anomaly Engine) ---")
-    anomaly_engine.fit_from_db()
-    print(" -> Model B statistical baselines saved to artifacts/facility_baselines.json")
 
     # Model C: LightGBM 24h Escalation Risk Model (Filtered duty_cycle < 0.2)
     print("\n--- Training Model C (LightGBM 24h Risk Escalation Model) ---")

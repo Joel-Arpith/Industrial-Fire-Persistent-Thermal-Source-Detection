@@ -36,7 +36,7 @@ import requests
 
 # Ensure module import works when run as script
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config.settings import OVERPASS_URL, OSM_CACHE_PATH, DEFAULT_BBOX, DATA_DIR
+from config.settings import OVERPASS_URL, OSM_CACHE_PATH, DEFAULT_BBOX
 
 
 def build_overpass_query(south: float, west: float, north: float, east: float, timeout: int = 60) -> str:

@@ -26,13 +26,10 @@ import os
 import sys
 import json
 import argparse
-from typing import Dict, Any, List, Tuple, Optional
-import numpy as np
+from typing import Dict, Any, Tuple, Optional
 import pandas as pd
 import geopandas as gpd
 from shapely.geometry import Point, Polygon, MultiPolygon, LineString
-from shapely.ops import transform
-import pyproj
 
 # Ensure module import works when run as script
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

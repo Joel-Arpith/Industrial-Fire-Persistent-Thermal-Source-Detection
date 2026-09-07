@@ -27,13 +27,10 @@ STRICT RULES OBSERVED:
 import os
 import sys
 import argparse
-from typing import List, Dict
 import pandas as pd
-import numpy as np
 
 # Ensure module import works when run as script
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config.settings import EVENT_TYPES
 
 
 def classify_point_heuristic(row: pd.Series) -> str:

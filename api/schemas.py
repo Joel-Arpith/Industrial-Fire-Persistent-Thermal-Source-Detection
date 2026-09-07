@@ -19,7 +19,7 @@ STRICT RULES OBSERVED:
       escalating_24h, risk_24h, needs_manual_review, top_shap_features).
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 
 
@@ -97,32 +97,3 @@ class FacilityHistoryResponse(BaseModel):
     lower_3sigma_threshold: float
     sample_count: int
     history: List[FacilityHistoryPoint]
-
-
-if __name__ == "__main__":
-    sample = HotspotResponse(
-        event_id="evt_20260904_0032",
-        lat=21.17,
-        lon=72.83,
-        observed=ObservedData(
-            frp=42.3,
-            confidence=87,
-            acq_date="2026-09-04",
-            nearest_industrial_type="refinery",
-            dist_to_industrial_m=210,
-        ),
-        inferred=InferredData(
-            event_type="industrial_flare",
-            event_type_confidence=0.91,
-            anomaly_score_normalized=0.12,
-            hazard_weight=0.1,
-            exposure_factor=0.4,
-            final_risk_score=0.048,
-            escalating_24h=False,
-            risk_24h=0.08,
-            needs_manual_review=False,
-            top_shap_features=["dist_to_nearest_industrial_m", "night_detection_fraction", "daynight"],
-        ),
-    )
-    print("Schema Validation Test Successful:")
-    print(sample.model_dump_json(indent=2))
