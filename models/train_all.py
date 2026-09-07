@@ -126,7 +126,7 @@ def run_training_pipeline(
     # -------------------------------------------------------------------------
     # STEP 6: Train Models A, B, and C
     # -------------------------------------------------------------------------
-    print("\n>>> [STEP 6/7] Training Models A, B, and C...")
+    print("\n>>> [STEP 6/7] Training Models A and C (Model B baselines fit in Step 4)...")
 
     # Model A: LightGBM Multiclass Classifier + SHAP TreeExplainer
     print("\n--- Training Model A (LightGBM Multi-Class Event Classifier) ---")

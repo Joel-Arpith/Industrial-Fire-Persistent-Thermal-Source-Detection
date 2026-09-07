@@ -37,6 +37,7 @@ STRICT RULES OBSERVED:
 
 import os
 import sys
+import argparse
 from typing import Dict, Any
 import numpy as np
 
@@ -118,3 +119,28 @@ class ScoreCombiner:
             "needs_manual_review": needs_review,
             "top_shap_features": top_shap,
         }
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Score Combiner Engine")
+    parser.add_argument("--event_type", type=str, default="industrial_flare")
+    parser.add_argument("--confidence", type=float, default=0.91)
+    parser.add_argument("--anomaly_norm", type=float, default=0.12)
+    parser.add_argument("--risk_24h", type=float, default=0.08)
+    parser.add_argument("--dist_pop", type=float, default=1500.0)
+    parser.add_argument("--dist_infra", type=float, default=400.0)
+    args = parser.parse_args()
+
+    combiner = ScoreCombiner()
+    mock_a = {
+        "event_type": args.event_type,
+        "event_type_confidence": args.confidence,
+        "top_shap_features": ["dist_to_nearest_industrial_m", "night_detection_fraction", "daynight"],
+    }
+    mock_b = {"anomaly_score_normalized": args.anomaly_norm}
+    mock_c = {"risk_24h": args.risk_24h, "escalating_24h": args.risk_24h >= 0.50}
+
+    res = combiner.combine(mock_a, mock_b, mock_c, args.dist_pop, args.dist_infra)
+    print("[ScoreCombiner] Result:")
+    import pprint
+    pprint.pprint(res)
