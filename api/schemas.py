@@ -19,7 +19,7 @@ STRICT RULES OBSERVED:
       escalating_24h, risk_24h, needs_manual_review, top_shap_features).
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
 
