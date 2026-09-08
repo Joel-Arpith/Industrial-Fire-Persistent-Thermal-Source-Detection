@@ -99,6 +99,26 @@ class FacilityHistoryResponse(BaseModel):
     history: List[FacilityHistoryPoint]
 
 
+class RegionBBox(BaseModel):
+    """
+    Bounding box coordinates in degrees.
+    """
+    west: float = Field(..., description="Western longitude boundary")
+    south: float = Field(..., description="Southern latitude boundary")
+    east: float = Field(..., description="Eastern longitude boundary")
+    north: float = Field(..., description="Northern latitude boundary")
+
+
+class RegionInfo(BaseModel):
+    """
+    Predefined Indian region metadata for frontend selection dropdowns.
+    """
+    name: str = Field(..., description="Region key/identifier (e.g. 'gujarat', 'maharashtra')")
+    label: str = Field(..., description="Human-readable title and coverage cities")
+    bbox: RegionBBox = Field(..., description="Bounding box definition")
+    description: Optional[str] = Field("", description="Regional industrial profile description")
+
+
 if __name__ == "__main__":
     sample = HotspotResponse(
         event_id="evt_20260904_0032",

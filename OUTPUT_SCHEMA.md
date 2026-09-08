@@ -22,15 +22,100 @@ Format: `application/json`
 
 ---
 
-### Endpoint 1: `GET /hotspots`
+### Endpoint 1: `GET /regions`
 
-Retrieves all active thermal hotspots for a specified spatial bounding box and lookback window.
+Returns the registry of available predefined Indian industrial regions (name, human-readable label, bounding box, and industrial profile description) so that the frontend dashboard can render a dynamic region-picker dropdown.
+
+#### Response Schema (Array of Region Objects)
+
+```typescript
+interface RegionInfo {
+  name: string;        // Unique identifier key (e.g. "gujarat", "maharashtra", "odisha", "all_india")
+  label: string;       // Human-friendly title and coverage cities
+  bbox: {
+    west: number;      // Western longitude in degrees
+    south: number;     // Southern latitude in degrees
+    east: number;      // Eastern longitude in degrees
+    north: number;     // Northern latitude in degrees
+  };
+  description: string; // Summary of key industries, refineries, and installations in the region
+}
+```
+
+#### Sample Response Payload (`GET /regions`)
+
+```json
+[
+  {
+    "name": "gujarat",
+    "label": "Gujarat Industrial Belt (Hazira, Dahej, Jamnagar, Surat)",
+    "bbox": {
+      "west": 69.5,
+      "south": 20.5,
+      "east": 73.8,
+      "north": 23.0
+    },
+    "description": "Petrochemical refineries, LNG terminals, ports, and heavy chemical clusters in Gujarat."
+  },
+  {
+    "name": "maharashtra",
+    "label": "Maharashtra Industrial Belt (Mumbai, MMR, Pune, Raigad, Tarapur)",
+    "bbox": {
+      "west": 72.6,
+      "south": 18.3,
+      "east": 74.5,
+      "north": 20.0
+    },
+    "description": "Chemical corridors, manufacturing MIDCs, and energy installations in Maharashtra."
+  },
+  {
+    "name": "odisha",
+    "label": "Odisha Industrial Belt (Angul, Jharsuguda, Paradip, Kalinganagar)",
+    "bbox": {
+      "west": 83.5,
+      "south": 19.8,
+      "east": 87.0,
+      "north": 22.2
+    },
+    "description": "Steel plants, aluminum smelters, coal mining complexes, and deep-water ports in Odisha."
+  },
+  {
+    "name": "chhattisgarh_jharkhand",
+    "label": "East-Central Mining & Steel Belt (Bhilai, Korba, Dhanbad, Jamshedpur)",
+    "bbox": {
+      "west": 81.0,
+      "south": 21.0,
+      "east": 86.8,
+      "north": 24.2
+    },
+    "description": "Coal fields, thermal power plants, and integrated steelworks in CG & JH."
+  },
+  {
+    "name": "all_india",
+    "label": "All India Coverage",
+    "bbox": {
+      "west": 68.0,
+      "south": 6.5,
+      "east": 97.5,
+      "north": 37.5
+    },
+    "description": "Nationwide active fire and thermal anomaly coverage across the Indian subcontinent."
+  }
+]
+```
+
+---
+
+### Endpoint 2: `GET /hotspots`
+
+Retrieves all active thermal hotspots for a specified Indian region or custom spatial bounding box, running the full ML pipeline and returning scored detections.
 
 #### Query Parameters
 
 | Parameter | Type | Required | Default | Description | Example |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `bbox` | `string` | Optional | Default Demo BBox | Bounding box coordinates: `west,south,east,north` in degrees. | `72.5,21.0,73.5,22.0` |
+| `region` | `string` | Optional | `gujarat` | **Primary Interface**: Named Indian region key (`gujarat`, `maharashtra`, `odisha`, `chhattisgarh_jharkhand`, `all_india`). **Takes precedence over `bbox`**. | `maharashtra` |
+| `bbox` | `string` | Optional | Derived from region | Advanced manual override: `west,south,east,north` in degrees. Used only if `region` is omitted. | `72.5,21.0,73.5,22.0` |
 | `since_hours` | `integer` | Optional | `24` | Historical lookback window in hours. | `48` |
 
 #### Response Schema (Array of Hotspot Objects)
@@ -127,7 +212,7 @@ interface HotspotResponse {
 
 ---
 
-### Endpoint 2: `GET /hotspot/{event_id}`
+### Endpoint 3: `GET /hotspot/{event_id}`
 
 Fetches the complete diagnostic profile, full 19-feature vector, and 7-class probability breakdown for a specific thermal event.
 
@@ -246,7 +331,7 @@ interface HotspotDetailResponse {
 
 ---
 
-### Endpoint 3: `GET /facility/{location_key}/history`
+### Endpoint 4: `GET /facility/{location_key}/history`
 
 Returns the historical FRP time series along with robust Median + MAD statistical baseline bands for time-series chart rendering.
 

@@ -22,7 +22,7 @@ OUTPUT:
 
 import os
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Any, Optional
 from dotenv import load_dotenv
 
 # Base Directory paths
@@ -43,13 +43,83 @@ FIRMS_MAP_KEY: str = os.getenv("FIRMS_MAP_KEY", "")
 FIRMS_BASE_URL: str = "https://firms.modaps.eosdis.nasa.gov/api/area/csv"
 FIRMS_SOURCE: str = "VIIRS_SNPP_NRT"
 
-# Default Bounding Box for Industrial Monitoring: Gujarat / Hazira / Dahej Industrial Belt
-DEFAULT_BBOX: Dict[str, float] = {
-    "west": float(os.getenv("DEMO_BBOX_WEST", 72.5)),
-    "south": float(os.getenv("DEMO_BBOX_SOUTH", 21.0)),
-    "east": float(os.getenv("DEMO_BBOX_EAST", 73.5)),
-    "north": float(os.getenv("DEMO_BBOX_NORTH", 22.0)),
+# =====================================================================
+# India Regional Registry (Single Source of Truth for Bounding Boxes)
+# =====================================================================
+
+REGIONS: Dict[str, Dict[str, Any]] = {
+    "gujarat": {
+        "name": "gujarat",
+        "label": "Gujarat Industrial Belt (Hazira, Dahej, Jamnagar, Surat)",
+        "bbox": {"west": 69.5, "south": 20.5, "east": 73.8, "north": 23.0},
+        "description": "Petrochemical refineries, LNG terminals, ports, and heavy chemical clusters in Gujarat.",
+    },
+    "maharashtra": {
+        "name": "maharashtra",
+        "label": "Maharashtra Industrial Belt (Mumbai, MMR, Pune, Raigad, Tarapur)",
+        "bbox": {"west": 72.6, "south": 18.3, "east": 74.5, "north": 20.0},
+        "description": "Chemical corridors, manufacturing MIDCs, and energy installations in Maharashtra.",
+    },
+    "odisha": {
+        "name": "odisha",
+        "label": "Odisha Industrial Belt (Angul, Jharsuguda, Paradip, Kalinganagar)",
+        "bbox": {"west": 83.5, "south": 19.8, "east": 87.0, "north": 22.2},
+        "description": "Steel plants, aluminum smelters, coal mining complexes, and deep-water ports in Odisha.",
+    },
+    "chhattisgarh_jharkhand": {
+        "name": "chhattisgarh_jharkhand",
+        "label": "East-Central Mining & Steel Belt (Bhilai, Korba, Dhanbad, Jamshedpur)",
+        "bbox": {"west": 81.0, "south": 21.0, "east": 86.8, "north": 24.2},
+        "description": "Coal fields, thermal power plants, and integrated steelworks in CG & JH.",
+    },
+    "all_india": {
+        "name": "all_india",
+        "label": "All India Coverage",
+        "bbox": {"west": 68.0, "south": 6.5, "east": 97.5, "north": 37.5},
+        "description": "Nationwide active fire and thermal anomaly coverage across the Indian subcontinent.",
+    },
 }
+
+# Alias for backwards compatibility or alternative naming
+REGIONS["gujarat_jamnagar"] = REGIONS["gujarat"]
+
+
+def get_region_bbox(region_name: Optional[str] = None) -> Dict[str, float]:
+    """
+    Resolves a region key against the REGIONS registry.
+    Returns a copy of the bounding box dict {west, south, east, north}.
+    Falls back to the default region ("gujarat") if name is invalid or omitted.
+    """
+    if not region_name:
+        return dict(REGIONS[DEFAULT_REGION]["bbox"])
+    
+    key = str(region_name).strip().lower()
+    if key in REGIONS:
+        return dict(REGIONS[key]["bbox"])
+    
+    # Check if key matches without underscores or hyphens
+    normalized_key = key.replace("-", "_").replace(" ", "_")
+    if normalized_key in REGIONS:
+        return dict(REGIONS[normalized_key]["bbox"])
+
+    print(f"[Settings] Warning: Unknown region '{region_name}'. Falling back to '{DEFAULT_REGION}'.")
+    return dict(REGIONS[DEFAULT_REGION]["bbox"])
+
+
+def get_regions_list() -> List[Dict[str, Any]]:
+    """
+    Returns list of standard regions for API serialization.
+    Filters out duplicate aliases.
+    """
+    unique_keys = ["gujarat", "maharashtra", "odisha", "chhattisgarh_jharkhand", "all_india"]
+    return [REGIONS[k] for k in unique_keys if k in REGIONS]
+
+
+# Default Active Region
+DEFAULT_REGION: str = os.getenv("DEFAULT_REGION", "gujarat")
+
+# Default Bounding Box derived directly from REGIONS registry (Single Source of Truth)
+DEFAULT_BBOX: Dict[str, float] = get_region_bbox(DEFAULT_REGION)
 
 # OpenStreetMap / Overpass Settings
 OVERPASS_URL: str = os.getenv("OVERPASS_URL", "https://overpass-api.de/api/interpreter")

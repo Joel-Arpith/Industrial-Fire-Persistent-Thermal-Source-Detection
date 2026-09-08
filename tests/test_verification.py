@@ -123,10 +123,31 @@ def test_end_to_end_pipeline():
     assert "needs_manual_review" in score_res
     assert "escalating_24h" in score_res
 
-    print("\n--- 9. Testing FastAPI HTTP Endpoints ---")
+    print("\n--- 9. Testing FastAPI HTTP Endpoints (including /regions and region selection) ---")
     client = TestClient(app)
 
-    # Test /hotspots
+    # Test GET /regions
+    regions_resp = client.get("/regions")
+    assert regions_resp.status_code == 200
+    regions_data = regions_resp.json()
+    assert isinstance(regions_data, list)
+    region_names = [r["name"] for r in regions_data]
+    assert "gujarat" in region_names
+    assert "maharashtra" in region_names
+    assert "odisha" in region_names
+    assert "all_india" in region_names
+    print(f" -> GET /regions verified: {region_names}")
+
+    # Test GET /hotspots with region query
+    resp_reg = client.get("/hotspots?region=gujarat&since_hours=24")
+    assert resp_reg.status_code == 200
+    assert isinstance(resp_reg.json(), list)
+
+    # Test GET /hotspots with invalid region (should return 400 Bad Request)
+    resp_invalid = client.get("/hotspots?region=non_existent_region")
+    assert resp_invalid.status_code == 400
+
+    # Test /hotspots default
     resp = client.get("/hotspots?since_hours=24")
     assert resp.status_code == 200
     data = resp.json()

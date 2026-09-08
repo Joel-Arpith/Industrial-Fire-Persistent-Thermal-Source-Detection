@@ -36,7 +36,15 @@ import requests
 
 # Ensure module import works when run as script
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config.settings import OVERPASS_URL, OSM_CACHE_PATH, DEFAULT_BBOX
+from config.settings import (
+    OVERPASS_URL,
+    OSM_CACHE_PATH,
+    DEFAULT_BBOX,
+    DEFAULT_REGION,
+    REGIONS,
+    get_region_bbox,
+    DATA_DIR,
+)
 
 
 def build_overpass_query(south: float, west: float, north: float, east: float, timeout: int = 60) -> str:
@@ -176,10 +184,11 @@ def generate_fallback_osm_data(south: float, west: float, north: float, east: fl
 
 
 def fetch_osm_industrial_and_exposure(
-    west: float = DEFAULT_BBOX["west"],
-    south: float = DEFAULT_BBOX["south"],
-    east: float = DEFAULT_BBOX["east"],
-    north: float = DEFAULT_BBOX["north"],
+    region: Optional[str] = None,
+    west: Optional[float] = None,
+    south: Optional[float] = None,
+    east: Optional[float] = None,
+    north: Optional[float] = None,
     cache_path: Optional[Path] = None,
     force_refresh: bool = False,
 ) -> Dict[str, Any]:
@@ -187,7 +196,23 @@ def fetch_osm_industrial_and_exposure(
     Fetches OSM industrial facilities, solar plants, landfills, populated areas,
     and critical infrastructure using Overpass API with `out geom;`.
     Caches results locally to guarantee fast and deterministic offline operation.
+
+    Args:
+        region: Named Indian region key (e.g. 'gujarat', 'maharashtra', 'odisha', 'all_india').
+        west, south, east, north: Optional explicit BBox coordinate overrides in degrees.
+        cache_path: Optional destination Path for cached JSON.
+        force_refresh: If True, queries live Overpass API even if local cache exists.
     """
+    if west is None or south is None or east is None or north is None:
+        target_region = region or DEFAULT_REGION
+        bbox = get_region_bbox(target_region)
+        w = float(west if west is not None else bbox["west"])
+        s = float(south if south is not None else bbox["south"])
+        e = float(east if east is not None else bbox["east"])
+        n = float(north if north is not None else bbox["north"])
+    else:
+        w, s, e, n = float(west), float(south), float(east), float(north)
+
     target_cache = cache_path or OSM_CACHE_PATH
     if target_cache.exists() and not force_refresh:
         print(f"[OSM] Loading cached OSM geometries from {target_cache}")
@@ -197,8 +222,8 @@ def fetch_osm_industrial_and_exposure(
         except Exception as e:
             print(f"[OSM] Error reading cache ({e}), re-fetching from API...")
 
-    query = build_overpass_query(south, west, north, east)
-    print(f"[OSM] Querying Overpass API ({OVERPASS_URL}) for bbox [{west}, {south}, {east}, {north}]...")
+    query = build_overpass_query(s, w, n, e)
+    print(f"[OSM] Querying Overpass API ({OVERPASS_URL}) for bbox [{w}, {s}, {e}, {n}]...")
     
     try:
         response = requests.post(OVERPASS_URL, data={"data": query}, timeout=90)
@@ -209,7 +234,7 @@ def fetch_osm_industrial_and_exposure(
             
             if elements_count == 0:
                 print("[OSM] Query returned 0 elements, generating fallback geometric reference data.")
-                data = generate_fallback_osm_data(south, west, north, east)
+                data = generate_fallback_osm_data(s, w, n, e)
 
             target_cache.parent.mkdir(parents=True, exist_ok=True)
             with open(target_cache, "w", encoding="utf-8") as f:
@@ -222,7 +247,7 @@ def fetch_osm_industrial_and_exposure(
         print(f"[OSM] Overpass connection failed: {e}")
 
     # Fallback if network fails
-    data = generate_fallback_osm_data(south, west, north, east)
+    data = generate_fallback_osm_data(s, w, n, e)
     target_cache.parent.mkdir(parents=True, exist_ok=True)
     with open(target_cache, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
@@ -231,15 +256,17 @@ def fetch_osm_industrial_and_exposure(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch and Cache OSM Geometries via Overpass API")
-    parser.add_argument("--west", type=float, default=DEFAULT_BBOX["west"])
-    parser.add_argument("--south", type=float, default=DEFAULT_BBOX["south"])
-    parser.add_argument("--east", type=float, default=DEFAULT_BBOX["east"])
-    parser.add_argument("--north", type=float, default=DEFAULT_BBOX["north"])
+    parser.add_argument("--region", type=str, default=DEFAULT_REGION, help=f"Named Indian industrial region ({', '.join(REGIONS.keys())})")
+    parser.add_argument("--west", type=float, default=None, help="Optional raw west bbox override")
+    parser.add_argument("--south", type=float, default=None, help="Optional raw south bbox override")
+    parser.add_argument("--east", type=float, default=None, help="Optional raw east bbox override")
+    parser.add_argument("--north", type=float, default=None, help="Optional raw north bbox override")
     parser.add_argument("--output", type=str, default=str(OSM_CACHE_PATH))
     parser.add_argument("--force", action="store_true", help="Force refresh cache from Overpass API")
     args = parser.parse_args()
 
     data = fetch_osm_industrial_and_exposure(
+        region=args.region,
         west=args.west,
         south=args.south,
         east=args.east,

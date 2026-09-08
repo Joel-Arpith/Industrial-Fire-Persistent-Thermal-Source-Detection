@@ -35,7 +35,16 @@ import numpy as np
 
 # Ensure module import works when run as script
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config.settings import FIRMS_MAP_KEY, FIRMS_BASE_URL, FIRMS_SOURCE, DEFAULT_BBOX
+from config.settings import (
+    FIRMS_MAP_KEY,
+    FIRMS_BASE_URL,
+    FIRMS_SOURCE,
+    DEFAULT_BBOX,
+    DEFAULT_REGION,
+    REGIONS,
+    get_region_bbox,
+    DATA_DIR,
+)
 
 # Required schema columns from VIIRS NRT
 REQUIRED_FIRMS_COLUMNS = [
@@ -224,10 +233,11 @@ def generate_synthetic_firms_sample(
 
 
 def fetch_firms_hotspots(
-    west: float = DEFAULT_BBOX["west"],
-    south: float = DEFAULT_BBOX["south"],
-    east: float = DEFAULT_BBOX["east"],
-    north: float = DEFAULT_BBOX["north"],
+    region: Optional[str] = None,
+    west: Optional[float] = None,
+    south: Optional[float] = None,
+    east: Optional[float] = None,
+    north: Optional[float] = None,
     total_days: int = 30,
     map_key: Optional[str] = None,
 ) -> pd.DataFrame:
@@ -236,17 +246,29 @@ def fetch_firms_hotspots(
     windows to strictly respect the FIRMS Area API transaction rate limits.
 
     Args:
-        west, south, east, north: BBox coordinates.
+        region: Named Indian region key (e.g. 'gujarat', 'maharashtra', 'odisha', 'all_india').
+        west, south, east, north: Optional explicit BBox coordinate overrides in degrees.
         total_days: Total lookback window in days.
         map_key: NASA FIRMS Map Key (falls back to FIRMS_MAP_KEY environment variable).
 
     Returns:
         Consolidated DataFrame of all hotspot records.
     """
+    # Resolve bounding box coordinates: explicit overrides take precedence, else look up region
+    if west is None or south is None or east is None or north is None:
+        target_region = region or DEFAULT_REGION
+        bbox = get_region_bbox(target_region)
+        w = float(west if west is not None else bbox["west"])
+        s = float(south if south is not None else bbox["south"])
+        e = float(east if east is not None else bbox["east"])
+        n = float(north if north is not None else bbox["north"])
+    else:
+        w, s, e, n = float(west), float(south), float(east), float(north)
+
     key = map_key or FIRMS_MAP_KEY
     if not key or key.strip() == "" or key.startswith("your_"):
-        print("[FIRMS] Notice: No valid FIRMS_MAP_KEY found. Utilizing offline synthetic simulation generator.")
-        return generate_synthetic_firms_sample(west, south, east, north, days=total_days)
+        print(f"[FIRMS] Notice: No valid FIRMS_MAP_KEY found. Utilizing offline synthetic simulation generator for bbox [{w}, {s}, {e}, {n}].")
+        return generate_synthetic_firms_sample(w, s, e, n, days=total_days)
 
     all_dfs: List[pd.DataFrame] = []
     
@@ -261,10 +283,10 @@ def fetch_firms_hotspots(
 
         df_batch = fetch_firms_batch(
             map_key=key,
-            west=west,
-            south=south,
-            east=east,
-            north=north,
+            west=w,
+            south=s,
+            east=e,
+            north=n,
             day_range=days_in_batch,
             date_str=date_str,
         )
@@ -278,7 +300,7 @@ def fetch_firms_hotspots(
 
     if not all_dfs:
         print("[FIRMS] No live data returned from API, generating fallback data.")
-        return generate_synthetic_firms_sample(west, south, east, north, days=total_days)
+        return generate_synthetic_firms_sample(w, s, e, n, days=total_days)
 
     consolidated = pd.concat(all_dfs, ignore_index=True)
     consolidated.drop_duplicates(subset=["latitude", "longitude", "acq_date", "acq_time"], inplace=True)
@@ -289,15 +311,17 @@ def fetch_firms_hotspots(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Fetch NASA FIRMS Thermal Hotspots")
-    parser.add_argument("--west", type=float, default=DEFAULT_BBOX["west"])
-    parser.add_argument("--south", type=float, default=DEFAULT_BBOX["south"])
-    parser.add_argument("--east", type=float, default=DEFAULT_BBOX["east"])
-    parser.add_argument("--north", type=float, default=DEFAULT_BBOX["north"])
+    parser.add_argument("--region", type=str, default=DEFAULT_REGION, help=f"Named Indian industrial region ({', '.join(REGIONS.keys())})")
+    parser.add_argument("--west", type=float, default=None, help="Optional raw west bbox override")
+    parser.add_argument("--south", type=float, default=None, help="Optional raw south bbox override")
+    parser.add_argument("--east", type=float, default=None, help="Optional raw east bbox override")
+    parser.add_argument("--north", type=float, default=None, help="Optional raw north bbox override")
     parser.add_argument("--days", type=int, default=14)
     parser.add_argument("--output", type=str, default="data/firms_raw.csv")
     args = parser.parse_args()
 
     df_hotspots = fetch_firms_hotspots(
+        region=args.region,
         west=args.west,
         south=args.south,
         east=args.east,

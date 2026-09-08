@@ -30,8 +30,26 @@ import uvicorn
 
 # Ensure module import works when run as script
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config.settings import DEFAULT_BBOX, DB_PATH, ARTIFACTS_DIR, OSM_CACHE_PATH, API_HOST, API_PORT
-from api.schemas import HotspotResponse, ObservedData, InferredData, HotspotDetailResponse, FacilityHistoryResponse
+from config.settings import (
+    DEFAULT_BBOX,
+    DEFAULT_REGION,
+    REGIONS,
+    get_region_bbox,
+    get_regions_list,
+    DB_PATH,
+    ARTIFACTS_DIR,
+    OSM_CACHE_PATH,
+    API_HOST,
+    API_PORT,
+)
+from api.schemas import (
+    HotspotResponse,
+    ObservedData,
+    InferredData,
+    HotspotDetailResponse,
+    FacilityHistoryResponse,
+    RegionInfo,
+)
 from data_ingestion.fetch_firms import fetch_firms_hotspots
 from processing.spatial_join import perform_spatial_join
 from processing.clustering import cluster_hotspots_spatiotemporal
@@ -45,7 +63,7 @@ from models.score_combiner import ScoreCombiner
 # Initialize FastAPI App
 app = FastAPI(
     title="Industrial Fire & Persistent Thermal Source Detection API",
-    description="Operational API for classifying industrial flares, accidents, wildfires, and unauthorized thermal sources.",
+    description="Operational API for classifying industrial flares, accidents, wildfires, and unauthorized thermal sources across India.",
     version="1.0.0",
 )
 
@@ -99,6 +117,8 @@ def root():
         "service": "Industrial Fire & Persistent Thermal Source Detection API",
         "status": "online",
         "endpoints": [
+            "/regions",
+            "/hotspots?region={region}&since_hours={hours}",
             "/hotspots?bbox={west},{south},{east},{north}&since_hours={hours}",
             "/hotspot/{event_id}",
             "/facility/{location_key}/history",
@@ -106,40 +126,59 @@ def root():
     }
 
 
+@app.get("/regions", response_model=List[RegionInfo])
+def get_regions():
+    """
+    Returns the list of available predefined Indian industrial regions (name, label, bbox, description)
+    so frontend dashboards can build a dynamic region-picker dropdown.
+    """
+    return get_regions_list()
+
+
 @app.get("/hotspots", response_model=List[HotspotResponse])
 def get_hotspots(
+    region: Optional[str] = Query(
+        None,
+        description="Named Indian region (e.g. 'gujarat', 'maharashtra', 'odisha', 'all_india'). Takes precedence over bbox.",
+    ),
     bbox: Optional[str] = Query(
         None,
-        description="Bounding box in 'west,south,east,north' format. Example: '72.5,21.0,73.5,22.0'",
+        description="Bounding box in 'west,south,east,north' format. Example: '72.5,21.0,73.5,22.0'. Used if region is omitted.",
     ),
     since_hours: int = Query(24, description="Lookback window in hours (default: 24)"),
 ):
     """
-    Pulls recent satellite thermal hotspots, executes the spatial and feature pipeline,
-    and returns scored points with satellite evidence separated from model inferences.
+    Pulls recent satellite thermal hotspots for a region or bounding box,
+    executes the spatial and feature pipeline, and returns scored points with
+    satellite evidence separated from model inferences.
     """
-    # Parse bounding box
-    if bbox and "," in bbox:
+    # 1. Resolve bounding box coordinates
+    # Priority 1: Named Indian Region
+    if region:
+        reg_clean = region.strip().lower()
+        if reg_clean not in REGIONS and reg_clean.replace("-", "_") not in REGIONS:
+            valid_keys = [r["name"] for r in get_regions_list()]
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown region '{region}'. Available regions: {valid_keys}",
+            )
+        box = get_region_bbox(reg_clean)
+        w, s, e, n = box["west"], box["south"], box["east"], box["north"]
+    # Priority 2: Raw Bounding Box String
+    elif bbox and "," in bbox:
         try:
             w, s, e, n = [float(x.strip()) for x in bbox.split(",")]
         except Exception:
-            w, s, e, n = (
-                DEFAULT_BBOX["west"],
-                DEFAULT_BBOX["south"],
-                DEFAULT_BBOX["east"],
-                DEFAULT_BBOX["north"],
-            )
+            box = get_region_bbox(DEFAULT_REGION)
+            w, s, e, n = box["west"], box["south"], box["east"], box["north"]
+    # Priority 3: Default Active Region
     else:
-        w, s, e, n = (
-            DEFAULT_BBOX["west"],
-            DEFAULT_BBOX["south"],
-            DEFAULT_BBOX["east"],
-            DEFAULT_BBOX["north"],
-        )
+        box = get_region_bbox(DEFAULT_REGION)
+        w, s, e, n = box["west"], box["south"], box["east"], box["north"]
 
     days_lookback = max(1, (since_hours + 23) // 24)
 
-    # 1. Fetch raw FIRMS hotspots
+    # 2. Fetch raw FIRMS hotspots
     df_raw = fetch_firms_hotspots(west=w, south=s, east=e, north=n, total_days=days_lookback)
     if df_raw.empty:
         return []

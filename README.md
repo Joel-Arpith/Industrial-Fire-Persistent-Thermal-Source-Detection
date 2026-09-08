@@ -29,21 +29,20 @@ Open `.env` and set your NASA FIRMS Map Key (free signup at [NASA EOSDIS FIRMS](
 ```env
 FIRMS_MAP_KEY=your_32_character_nasa_firms_map_key
 DB_PATH=data/hotspots.db
-DEMO_BBOX_WEST=72.5
-DEMO_BBOX_SOUTH=21.0
-DEMO_BBOX_EAST=73.5
-DEMO_BBOX_NORTH=22.0
+DEFAULT_REGION=gujarat
 ```
 *(Note: If `FIRMS_MAP_KEY` is omitted, the pipeline automatically provides a realistic synthetic industrial flare/wildfire data generator so that testing is immediately functional offline).*
 
 ### Step 3: Run the Complete Training Pipeline
-Execute the 7-step data ingestion, clustering, persistence logging, feature engineering, and model training sequence:
+Execute the 7-step data ingestion, clustering, persistence logging, feature engineering, and model training sequence for an Indian industrial belt:
 ```bash
+# Default: Gujarat Industrial Belt
 python -m models.train_all
-```
-Or specify a custom bounding box and lookback window:
-```bash
-python -m models.train_all --days 30 --west 72.5 --south 21.0 --east 73.5 --north 22.0
+
+# Or select any predefined Indian industrial belt (gujarat, maharashtra, odisha, chhattisgarh_jharkhand, all_india)
+python -m models.train_all --region maharashtra --days 30
+python -m models.train_all --region odisha --days 30
+python -m models.train_all --region all_india --days 14
 ```
 
 ### Step 4: Launch the FastAPI REST API Server
@@ -145,12 +144,12 @@ industrial-fire-detection/
 
 #### 2. Data Ingestion (`data_ingestion/`)
 - **`data_ingestion/fetch_firms.py`**
-  - **Command**: `python -m data_ingestion.fetch_firms --days 14 --output data/firms_raw.csv`
-  - **Inputs**: `FIRMS_MAP_KEY`, bounding box coordinates, day range.
+  - **Command**: `python -m data_ingestion.fetch_firms --region gujarat --days 14 --output data/firms_raw.csv`
+  - **Inputs**: `region` (e.g. `gujarat`, `maharashtra`, `odisha`, `all_india`) or raw coordinates, `FIRMS_MAP_KEY`, day range.
   - **Output**: CSV containing NASA VIIRS active fire observations.
 - **`data_ingestion/fetch_osm.py`**
-  - **Command**: `python -m data_ingestion.fetch_osm --output data/osm_cache.json`
-  - **Inputs**: Overpass API URL, bounding box coordinates.
+  - **Command**: `python -m data_ingestion.fetch_osm --region gujarat --output data/osm_cache.json`
+  - **Inputs**: `region` key, Overpass API URL, cached GeoJSON output path.
   - **Output**: Cached GeoJSON/JSON containing full OSM geometries (`out geom;`).
 - **`data_ingestion/fetch_landcover.py`**
   - **Command**: `python -m data_ingestion.fetch_landcover --lat 21.17 --lon 72.83`
@@ -201,8 +200,8 @@ industrial-fire-detection/
   - **Inputs**: Model A, B, C outputs and spatial exposure distances.
   - **Output**: Synthesized `final_risk_score` and routing flags (`needs_manual_review`, `escalating_24h`).
 - **`models/train_all.py`**
-  - **Command**: `python -m models.train_all --days 30`
-  - **Inputs**: Target region coordinates and lookback window.
+  - **Command**: `python -m models.train_all --region gujarat --days 30`
+  - **Inputs**: Indian region key (`--region`) or manual bounding box coordinates and lookback window.
   - **Output**: Runs the full 7-step pipeline and writes all trained artifacts to `artifacts/`.
 
 #### 5. API Layer (`api/`)
@@ -212,7 +211,8 @@ industrial-fire-detection/
 - **`api/main.py`**
   - **Command**: `uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload`
   - **Output**: Serves REST endpoints with top-level `observed` vs `inferred` separation:
-    - `GET /hotspots?bbox=72.5,21.0,73.5,22.0&since_hours=24`
+    - `GET /regions` (list available Indian industrial belts)
+    - `GET /hotspots?region=gujarat&since_hours=24` (or `?bbox=...`)
     - `GET /hotspot/{event_id}`
     - `GET /facility/{location_key}/history`
 

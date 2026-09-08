@@ -36,7 +36,16 @@ import argparse
 
 # Ensure module import works when run as script
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from config.settings import DEFAULT_BBOX, DB_PATH, ARTIFACTS_DIR, DATA_DIR, OSM_CACHE_PATH
+from config.settings import (
+    DEFAULT_BBOX,
+    DEFAULT_REGION,
+    REGIONS,
+    get_region_bbox,
+    DB_PATH,
+    ARTIFACTS_DIR,
+    DATA_DIR,
+    OSM_CACHE_PATH,
+)
 from data_ingestion.fetch_firms import fetch_firms_hotspots
 from data_ingestion.fetch_osm import fetch_osm_industrial_and_exposure
 from processing.spatial_join import perform_spatial_join
@@ -51,20 +60,34 @@ from models.score_combiner import ScoreCombiner
 
 
 def run_training_pipeline(
-    west: float = DEFAULT_BBOX["west"],
-    south: float = DEFAULT_BBOX["south"],
-    east: float = DEFAULT_BBOX["east"],
-    north: float = DEFAULT_BBOX["north"],
+    region: Optional[str] = None,
+    west: Optional[float] = None,
+    south: Optional[float] = None,
+    east: Optional[float] = None,
+    north: Optional[float] = None,
     days: int = 30,
 ) -> None:
     """
     Executes the 7-step data ingestion, processing, baseline fitting, and model training sequence.
     """
+    # Resolve bounding box coordinates
+    if west is None or south is None or east is None or north is None:
+        target_region = region or DEFAULT_REGION
+        bbox = get_region_bbox(target_region)
+        w = float(west if west is not None else bbox["west"])
+        s = float(south if south is not None else bbox["south"])
+        e = float(east if east is not None else bbox["east"])
+        n = float(north if north is not None else bbox["north"])
+    else:
+        target_region = region or "custom"
+        w, s, e, n = float(west), float(south), float(east), float(north)
+
     start_time = time.time()
     print("=" * 70)
     print("  INDUSTRIAL FIRE & PERSISTENT THERMAL SOURCE DETECTION PIPELINE")
     print("=" * 70)
-    print(f"Target Bounding Box: West={west}, South={south}, East={east}, North={north}")
+    print(f"Target Region:       {target_region}")
+    print(f"Target Bounding Box: West={w}, South={s}, East={e}, North={n}")
     print(f"Historical Window:   {days} days")
     print(f"Artifacts Path:      {ARTIFACTS_DIR}")
     print(f"Database Path:       {DB_PATH}\n")
@@ -73,12 +96,12 @@ def run_training_pipeline(
     # STEP 1: Ingestion & Spatial Join (Boundary Distances)
     # -------------------------------------------------------------------------
     print("\n>>> [STEP 1/7] Ingesting NASA FIRMS Hotspots & OSM Infrastructure Geometries...")
-    df_raw = fetch_firms_hotspots(west=west, south=south, east=east, north=north, total_days=days)
+    df_raw = fetch_firms_hotspots(west=w, south=s, east=e, north=n, total_days=days)
     if df_raw.empty:
         raise RuntimeError("No hotspot data available to train or process pipeline.")
 
     # Cache OSM infrastructure
-    fetch_osm_industrial_and_exposure(west=west, south=south, east=east, north=north)
+    fetch_osm_industrial_and_exposure(west=w, south=s, east=e, north=n)
     
     # Boundary distance spatial join
     df_joined = perform_spatial_join(df_raw, str(OSM_CACHE_PATH))
@@ -175,14 +198,16 @@ def run_training_pipeline(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="End-to-End Industrial Fire Pipeline & Model Trainer")
-    parser.add_argument("--west", type=float, default=DEFAULT_BBOX["west"])
-    parser.add_argument("--south", type=float, default=DEFAULT_BBOX["south"])
-    parser.add_argument("--east", type=float, default=DEFAULT_BBOX["east"])
-    parser.add_argument("--north", type=float, default=DEFAULT_BBOX["north"])
+    parser.add_argument("--region", type=str, default=DEFAULT_REGION, help=f"Named Indian industrial region ({', '.join(REGIONS.keys())})")
+    parser.add_argument("--west", type=float, default=None, help="Optional raw west bbox override")
+    parser.add_argument("--south", type=float, default=None, help="Optional raw south bbox override")
+    parser.add_argument("--east", type=float, default=None, help="Optional raw east bbox override")
+    parser.add_argument("--north", type=float, default=None, help="Optional raw north bbox override")
     parser.add_argument("--days", type=int, default=30)
     args = parser.parse_args()
 
     run_training_pipeline(
+        region=args.region,
         west=args.west,
         south=args.south,
         east=args.east,
