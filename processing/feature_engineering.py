@@ -106,6 +106,17 @@ def build_feature_table(
     # 3. Extract temporal indicators (month, is_agri_burn_season)
     df_feat = extract_temporal_features(df_feat)
 
+    # 4a. FIRMS ships the thermal bands as bright_ti4 / bright_ti5. The defaults block
+    # below names them brightness_ti4 / brightness_ti5, so those columns never existed
+    # and were created as the literal constants 315.0 / 295.0 for every row -- two of
+    # Model A's eighteen features carrying zero information. Alias them first.
+    for src, dst in (("bright_ti4", "brightness_ti4"), ("bright_ti5", "brightness_ti5")):
+        if src in df_feat.columns:
+            if dst not in df_feat.columns:
+                df_feat[dst] = df_feat[src]
+            else:
+                df_feat[dst] = df_feat[dst].where(df_feat[dst].notna(), df_feat[src])
+
     # 4. Fill defaults for missing numeric or spatial fields
     defaults = {
         "brightness_ti4": 315.0,
