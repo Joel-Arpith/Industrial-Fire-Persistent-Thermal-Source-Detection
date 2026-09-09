@@ -23,6 +23,8 @@ STRICT RULES OBSERVED:
 """
 
 import os
+import json
+import atexit
 import sys
 import argparse
 from typing import Dict
@@ -31,6 +33,7 @@ import pandas as pd
 
 # Ensure module import works when run as script
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from config.settings import DATA_DIR
 
 # ESA WorldCover 10m class map
 ESA_WORLDCOVER_MAP: Dict[int, str] = {
@@ -48,7 +51,36 @@ ESA_WORLDCOVER_MAP: Dict[int, str] = {
 }
 
 # Local in-memory cache to prevent redundant point queries
-_LANDCOVER_CACHE: Dict[str, str] = {}
+# Disk-backed so the cache survives the process. Each miss is a ~0.3s HTTP round trip to
+# openlandmap; on a 5,000-point pull an in-memory-only cache means re-paying 20-40 minutes
+# on every re-run, which dominates the pipeline's wall-clock.
+_LANDCOVER_CACHE_PATH = DATA_DIR / "landcover_cache.json"
+
+
+def _load_landcover_cache() -> Dict[str, str]:
+    try:
+        with open(_LANDCOVER_CACHE_PATH, "r") as fh:
+            return json.load(fh)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+
+
+def save_landcover_cache() -> None:
+    """Atomic write so an interrupted run cannot leave a truncated cache behind."""
+    try:
+        _LANDCOVER_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        tmp = _LANDCOVER_CACHE_PATH.with_suffix(".json.tmp")
+        with open(tmp, "w") as fh:
+            json.dump(_LANDCOVER_CACHE, fh)
+        os.replace(tmp, _LANDCOVER_CACHE_PATH)
+    except OSError as exc:
+        print(f"[LandCover] Could not persist cache: {exc}")
+
+
+_LANDCOVER_CACHE: Dict[str, str] = _load_landcover_cache()
+if _LANDCOVER_CACHE:
+    print(f"[LandCover] Reusing {len(_LANDCOVER_CACHE)} cached point lookups from disk.")
+atexit.register(save_landcover_cache)
 
 
 def sample_landcover_point(lat: float, lon: float, timeout: int = 5) -> str:
