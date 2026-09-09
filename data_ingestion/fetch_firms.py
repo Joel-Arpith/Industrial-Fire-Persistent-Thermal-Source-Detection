@@ -90,6 +90,32 @@ def select_sensor(date_str: Optional[str] = None) -> str:
         return FIRMS_SOURCE
 
 
+def normalise_confidence(df: pd.DataFrame) -> pd.DataFrame:
+    """VIIRS reports confidence as a letter, MODIS as 0-100. Downstream code assumes a
+    number: persistence_log does float(row["confidence"]), api/schemas types it as float,
+    and OUTPUT_SCHEMA documents "0 - 100". On real VIIRS data that raises
+    `ValueError: could not convert string to float: 'n'`.
+
+    It never surfaced because the synthetic generator emits uniform(75, 100), so every
+    run before this one exercised numbers that real FIRMS does not return.
+
+    Mapped to the midpoints of the confidence bands FIRMS documents for VIIRS.
+    """
+    if "confidence" not in df.columns:
+        return df
+    out = df.copy()
+    letters = {"l": 30.0, "n": 70.0, "h": 95.0}
+    out["confidence"] = (
+        pd.to_numeric(
+            out["confidence"].astype(str).str.strip().str.lower().map(letters).fillna(
+                pd.to_numeric(out["confidence"], errors="coerce")),
+            errors="coerce")
+        .fillna(70.0)
+        .astype(float)
+    )
+    return out
+
+
 def fetch_firms_batch(
     map_key: str,
     west: float,
@@ -139,7 +165,7 @@ def fetch_firms_batch(
             for col in REQUIRED_FIRMS_COLUMNS:
                 if col not in df.columns:
                     df[col] = np.nan
-            return df[REQUIRED_FIRMS_COLUMNS]
+            return normalise_confidence(df[REQUIRED_FIRMS_COLUMNS])
         else:
             print(f"[FIRMS] HTTP Error {response.status_code}: {response.text[:200]}")
             return pd.DataFrame(columns=REQUIRED_FIRMS_COLUMNS)
